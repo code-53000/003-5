@@ -4,6 +4,7 @@ import InfoBar from '@/components/InfoBar';
 import GameCanvas from '@/components/GameCanvas';
 import PauseOverlay from '@/components/PauseOverlay';
 import GameOverOverlay from '@/components/GameOverOverlay';
+import UpgradeOverlay from '@/components/UpgradeOverlay';
 import { CANVAS_SIZE } from '@/constants/game';
 
 const Game = () => {
@@ -28,6 +29,7 @@ const Game = () => {
         <GameCanvas />
         <PauseOverlay />
         <GameOverOverlay />
+        <UpgradeOverlay />
       </div>
 
       <div className="text-center flex-shrink-0">
@@ -35,6 +37,7 @@ const Game = () => {
         <div className="text-amber-200 text-xs font-pixel space-y-0.5">
           <p>↑ ↓ ← → or WASD : Move Train</p>
           <p>P : Pause / Continue</p>
+          <p>SPACE : Brake (requires upgrade)</p>
         </div>
       </div>
     </div>

@@ -10,6 +10,30 @@ export enum GameStatus {
   PLAYING = 'PLAYING',
   PAUSED = 'PAUSED',
   GAME_OVER = 'GAME_OVER',
+  UPGRADING = 'UPGRADING',
+}
+
+export enum UpgradeType {
+  SHIELD = 'SHIELD',
+  SHORTEN = 'SHORTEN',
+  MAGNET = 'MAGNET',
+  RADAR = 'RADAR',
+  BRAKE = 'BRAKE',
+}
+
+export interface Upgrade {
+  type: UpgradeType;
+  level: number;
+  usesRemaining?: number;
+  cooldownRemaining?: number;
+  isActive?: boolean;
+}
+
+export interface UpgradeOption {
+  type: UpgradeType;
+  name: string;
+  description: string;
+  icon: string;
 }
 
 export enum PassengerType {
@@ -59,4 +83,9 @@ export interface GameState {
   smokeParticles: SmokeParticle[];
   passengersCollected: number;
   passengerStats: PassengerStats;
+  upgrades: Upgrade[];
+  pendingUpgradeOptions: UpgradeOption[];
+  brakeActive: boolean;
+  brakeCooldown: number;
+  shieldFlash: boolean;
 }

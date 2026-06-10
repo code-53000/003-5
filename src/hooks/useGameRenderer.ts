@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Direction, GameStatus, TrainSegment, PassengerStation, SmokeParticle, PassengerType } from '@/types/game';
+import { Direction, GameStatus, TrainSegment, PassengerStation, SmokeParticle, PassengerType, UpgradeType } from '@/types/game';
 import { useGameStore } from '@/store/gameStore';
-import { CELL_SIZE, GRID_SIZE, COLORS, URGENT_PASSENGER_TICKS } from '@/constants/game';
+import { CELL_SIZE, GRID_SIZE, COLORS, URGENT_PASSENGER_TICKS, UPGRADE_COLORS } from '@/constants/game';
 
 const drawPixelRect = (
   ctx: CanvasRenderingContext2D,
@@ -111,6 +111,9 @@ export const useGameRenderer = (canvasRef: React.RefObject<HTMLCanvasElement>) =
   const smokeParticles = useGameStore((state) => state.smokeParticles);
   const status = useGameStore((state) => state.status);
   const nextDirection = useGameStore((state) => state.nextDirection);
+  const upgrades = useGameStore((state) => state.upgrades);
+  const shieldFlash = useGameStore((state) => state.shieldFlash);
+  const brakeActive = useGameStore((state) => state.brakeActive);
 
   const animationFrameRef = useRef<number | null>(null);
   const localSmokeRef = useRef<SmokeParticle[]>([]);
@@ -312,6 +315,100 @@ export const useGameRenderer = (canvasRef: React.RefObject<HTMLCanvasElement>) =
     []
   );
 
+  const drawRadarArrow = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      if (!station || train.length === 0) return;
+
+      const radarUpgrade = upgrades.find((u) => u.type === UpgradeType.RADAR);
+      if (!radarUpgrade) return;
+
+      const head = train[0];
+      const dx = station.x - head.x;
+      const dy = station.y - head.y;
+
+      if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) return;
+
+      const centerX = (GRID_SIZE * CELL_SIZE) / 2;
+      const centerY = (GRID_SIZE * CELL_SIZE) / 2;
+      const radius = (GRID_SIZE * CELL_SIZE) / 2 - 20;
+
+      const angle = Math.atan2(dy, dx);
+      const arrowX = centerX + Math.cos(angle) * radius;
+      const arrowY = centerY + Math.sin(angle) * radius;
+
+      ctx.save();
+      ctx.translate(arrowX, arrowY);
+      ctx.rotate(angle);
+
+      ctx.fillStyle = UPGRADE_COLORS[UpgradeType.RADAR];
+      ctx.globalAlpha = 0.8;
+
+      const arrowSize = 12;
+      ctx.beginPath();
+      ctx.moveTo(arrowSize, 0);
+      ctx.lineTo(-arrowSize / 2, -arrowSize / 2);
+      ctx.lineTo(-arrowSize / 2, arrowSize / 2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    },
+    [station, train, upgrades]
+  );
+
+  const drawShieldEffect = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      if (train.length === 0) return;
+
+      const shieldUpgrade = upgrades.find((u) => u.type === UpgradeType.SHIELD);
+      if (!shieldUpgrade || !shieldUpgrade.usesRemaining || shieldUpgrade.usesRemaining <= 0) return;
+
+      const head = train[0];
+      const px = head.x * CELL_SIZE;
+      const py = head.y * CELL_SIZE;
+      const size = CELL_SIZE;
+
+      ctx.save();
+      ctx.strokeStyle = UPGRADE_COLORS[UpgradeType.SHIELD];
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = shieldFlash ? 1 : 0.5;
+
+      const centerX = px + size / 2;
+      const centerY = py + size / 2;
+      const radius = size * 0.7;
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      for (let i = 0; i < shieldUpgrade.usesRemaining; i++) {
+        const dotAngle = (i / shieldUpgrade.usesRemaining) * Math.PI * 2 - Math.PI / 2;
+        const dotX = centerX + Math.cos(dotAngle) * (radius + 4);
+        const dotY = centerY + Math.sin(dotAngle) * (radius + 4);
+        drawPixelRect(ctx, dotX - 2, dotY - 2, 4, 4, UPGRADE_COLORS[UpgradeType.SHIELD]);
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    },
+    [train, upgrades, shieldFlash]
+  );
+
+  const drawBrakeIndicator = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      if (!brakeActive) return;
+
+      ctx.save();
+      ctx.fillStyle = UPGRADE_COLORS[UpgradeType.BRAKE];
+      ctx.globalAlpha = 0.3;
+      drawPixelRect(ctx, 0, 0, GRID_SIZE * CELL_SIZE, GRID_SIZE * CELL_SIZE, UPGRADE_COLORS[UpgradeType.BRAKE]);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    },
+    [brakeActive]
+  );
+
   const drawIdleHint = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = COLORS.TEXT;
     ctx.font = '12px "Press Start 2P", monospace';
@@ -341,6 +438,7 @@ export const useGameRenderer = (canvasRef: React.RefObject<HTMLCanvasElement>) =
     updateLocalSmoke();
 
     drawBackground(ctx);
+    drawBrakeIndicator(ctx);
 
     if (station) {
       drawStation(ctx, station);
@@ -348,6 +446,8 @@ export const useGameRenderer = (canvasRef: React.RefObject<HTMLCanvasElement>) =
 
     drawSmokeParticles(ctx, localSmokeRef.current);
     drawTrain(ctx);
+    drawShieldEffect(ctx);
+    drawRadarArrow(ctx);
 
     if (status === GameStatus.IDLE) {
       drawIdleHint(ctx);
@@ -361,6 +461,9 @@ export const useGameRenderer = (canvasRef: React.RefObject<HTMLCanvasElement>) =
     drawSmokeParticles,
     drawTrain,
     drawIdleHint,
+    drawRadarArrow,
+    drawShieldEffect,
+    drawBrakeIndicator,
     updateLocalSmoke,
     station,
     status,

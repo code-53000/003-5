@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { Direction, GameStatus, PassengerType } from '@/types/game';
+import { Direction, GameStatus, PassengerType, UpgradeType, UpgradeOption } from '@/types/game';
 import { useGameStore } from '@/store/gameStore';
 import {
   INITIAL_SPEED,
@@ -12,6 +12,8 @@ import {
   PASSENGER_SCORES,
   URGENT_PASSENGER_TICKS,
   URGENT_PASSENGER_PENALTY,
+  UPGRADE_OPTIONS,
+  UPGRADE_CONFIG,
 } from '@/constants/game';
 import { isOutOfBounds, isCollidingWithTrain, isSamePosition, getRandomEmptyPosition } from '@/utils/collision';
 
@@ -29,6 +31,13 @@ const getRandomPassengerType = (): PassengerType => {
   return PassengerType.NORMAL;
 };
 
+const generateRandomUpgrades = (): UpgradeOption[] => {
+  const allTypes = Object.values(UpgradeType);
+  const shuffled = [...allTypes].sort(() => Math.random() - 0.5);
+  const selectedTypes = shuffled.slice(0, 3);
+  return selectedTypes.map((type) => UPGRADE_OPTIONS[type]);
+};
+
 export const useGameEngine = () => {
   const {
     status,
@@ -39,6 +48,10 @@ export const useGameEngine = () => {
     level,
     score,
     passengersCollected,
+    upgrades,
+    brakeActive,
+    brakeCooldown,
+    shieldFlash,
     setDirection,
     setNextDirection,
     setStatus,
@@ -52,17 +65,31 @@ export const useGameEngine = () => {
     incrementPassengersCollected,
     decrementStationTicks,
     resetGame,
+    setPendingUpgradeOptions,
+    useShield,
+    setShieldFlash,
+    activateBrake,
+    deactivateBrake,
+    decrementBrakeCooldown,
+    moveStationTowardsTrain,
   } = useGameStore();
 
   const gameLoopRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(0);
   const particleIdRef = useRef(0);
+  const brakeDurationRef = useRef(0);
 
   const getSpeed = useCallback((): number => {
     const speedRange = INITIAL_SPEED - MIN_SPEED;
     const speedReduction = ((level - 1) * speedRange) / (MAX_LEVEL - 1);
-    return Math.max(MIN_SPEED, INITIAL_SPEED - speedReduction);
-  }, [level]);
+    let baseSpeed = Math.max(MIN_SPEED, INITIAL_SPEED - speedReduction);
+    
+    if (brakeActive) {
+      baseSpeed = baseSpeed / UPGRADE_CONFIG[UpgradeType.BRAKE].speedMultiplier;
+    }
+    
+    return baseSpeed;
+  }, [level, brakeActive]);
 
   const spawnStation = useCallback(() => {
     const pos = getRandomEmptyPosition(train);
@@ -122,7 +149,14 @@ export const useGameEngine = () => {
       y: head.y + vector.dy,
     };
 
-    if (isOutOfBounds(newHead) || isCollidingWithTrain(newHead, train, true)) {
+    const isDeadlyCollision = isOutOfBounds(newHead) || isCollidingWithTrain(newHead, train, true);
+    
+    if (isDeadlyCollision) {
+      const shieldUpgrade = upgrades.find((u) => u.type === UpgradeType.SHIELD);
+      if (shieldUpgrade && shieldUpgrade.usesRemaining && shieldUpgrade.usesRemaining > 0) {
+        useShield();
+        return;
+      }
       setStatus(GameStatus.GAME_OVER);
       return;
     }
@@ -151,6 +185,9 @@ export const useGameEngine = () => {
       const newLevel = Math.min(MAX_LEVEL, level + 1);
       if (newLevel !== level) {
         setLevel(newLevel);
+        const options = generateRandomUpgrades();
+        setPendingUpgradeOptions(options);
+        setStatus(GameStatus.UPGRADING);
       }
     }
   }, [
@@ -161,6 +198,7 @@ export const useGameEngine = () => {
     score,
     level,
     passengersCollected,
+    upgrades,
     setDirection,
     setNextDirection,
     setStatus,
@@ -169,6 +207,8 @@ export const useGameEngine = () => {
     setTrain,
     setStation,
     incrementPassengersCollected,
+    useShield,
+    setPendingUpgradeOptions,
   ]);
 
   const gameTick = useCallback(() => {
@@ -180,7 +220,43 @@ export const useGameEngine = () => {
       decrementStationTicks();
       handleUrgentStationTimeout();
     }
-  }, [moveTrain, addSmoke, removeExpiredSmoke, station, decrementStationTicks, handleUrgentStationTimeout]);
+
+    const magnetUpgrade = upgrades.find((u) => u.type === UpgradeType.MAGNET);
+    if (magnetUpgrade && station) {
+      moveStationTowardsTrain();
+    }
+
+    if (brakeActive) {
+      brakeDurationRef.current++;
+      if (brakeDurationRef.current >= UPGRADE_CONFIG[UpgradeType.BRAKE].duration) {
+        deactivateBrake();
+        brakeDurationRef.current = 0;
+      }
+    }
+
+    if (brakeCooldown > 0) {
+      decrementBrakeCooldown();
+    }
+
+    if (shieldFlash) {
+      setTimeout(() => setShieldFlash(false), 200);
+    }
+  }, [
+    moveTrain,
+    addSmoke,
+    removeExpiredSmoke,
+    station,
+    decrementStationTicks,
+    handleUrgentStationTimeout,
+    upgrades,
+    moveStationTowardsTrain,
+    brakeActive,
+    deactivateBrake,
+    brakeCooldown,
+    decrementBrakeCooldown,
+    shieldFlash,
+    setShieldFlash,
+  ]);
 
   const gameLoop = useCallback(
     (timestamp: number) => {
@@ -260,5 +336,6 @@ export const useGameEngine = () => {
     changeDirection,
     resetGame,
     getSpeed,
+    activateBrake,
   };
 };

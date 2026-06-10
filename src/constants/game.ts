@@ -1,4 +1,4 @@
-import { Direction, PassengerType } from '@/types/game';
+import { Direction, PassengerType, UpgradeType, UpgradeOption } from '@/types/game';
 
 export const GRID_SIZE = 20;
 export const CELL_SIZE = 30;
@@ -67,4 +67,61 @@ export const DIRECTION_VECTOR: Record<Direction, { dx: number; dy: number }> = {
   [Direction.DOWN]: { dx: 0, dy: 1 },
   [Direction.LEFT]: { dx: -1, dy: 0 },
   [Direction.RIGHT]: { dx: 1, dy: 0 },
+};
+
+export const UPGRADE_OPTIONS: Record<UpgradeType, UpgradeOption> = {
+  [UpgradeType.SHIELD]: {
+    type: UpgradeType.SHIELD,
+    name: '能量护盾',
+    description: '抵挡一次致命碰撞',
+    icon: '🛡️',
+  },
+  [UpgradeType.SHORTEN]: {
+    type: UpgradeType.SHORTEN,
+    name: '车身缩短',
+    description: '移除末节车厢',
+    icon: '✂️',
+  },
+  [UpgradeType.MAGNET]: {
+    type: UpgradeType.MAGNET,
+    name: '磁力吸附',
+    description: '站台自动靠拢',
+    icon: '🧲',
+  },
+  [UpgradeType.RADAR]: {
+    type: UpgradeType.RADAR,
+    name: '站台雷达',
+    description: '显示站台方向',
+    icon: '📡',
+  },
+  [UpgradeType.BRAKE]: {
+    type: UpgradeType.BRAKE,
+    name: '紧急刹车',
+    description: '短时降低速度',
+    icon: '⏸️',
+  },
+};
+
+export const UPGRADE_CONFIG = {
+  [UpgradeType.SHIELD]: {
+    initialUses: 1,
+    maxUsesPerLevel: 1,
+  },
+  [UpgradeType.MAGNET]: {
+    initialRange: 2,
+    rangePerLevel: 1,
+  },
+  [UpgradeType.BRAKE]: {
+    speedMultiplier: 0.5,
+    duration: 3,
+    cooldown: 10,
+  },
+} as const;
+
+export const UPGRADE_COLORS: Record<UpgradeType, string> = {
+  [UpgradeType.SHIELD]: '#3498db',
+  [UpgradeType.SHORTEN]: '#e74c3c',
+  [UpgradeType.MAGNET]: '#9b59b6',
+  [UpgradeType.RADAR]: '#f39c12',
+  [UpgradeType.BRAKE]: '#27ae60',
 };
